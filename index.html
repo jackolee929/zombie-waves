@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>屍潮狂襲 3.0・雙線無敵版</title>
+<title>屍潮狂襲 3.1・雙線無敵版</title>
 <style>
   /* ============ 全域 ============ */
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -38,6 +38,31 @@
     opacity: 0; pointer-events: none; z-index: 6; transition: opacity .2s;
   }
 
+  /* ============ 技能商城列 ============ */
+  #skillBar {
+    position: absolute; bottom: 62px; left: 0; right: 0;
+    display: flex; gap: 7px; padding: 0 10px; z-index: 8;
+  }
+  .skBtn {
+    flex: 1; background: linear-gradient(180deg, #241a3a, #16112a);
+    border: 1px solid #4a3a78; border-radius: 11px;
+    color: #e8dfff; padding: 6px 2px 5px; text-align: center;
+    cursor: pointer; user-select: none; position: relative; overflow: hidden;
+    transition: transform .08s;
+  }
+  .skBtn:active { transform: scale(.93); }
+  .skBtn .i { font-size: 17px; line-height: 1; }
+  .skBtn .n { font-size: 11px; font-weight: 700; margin-top: 2px; }
+  .skBtn .c { font-size: 10px; color: #ffd24d; }
+  .skBtn.dim { opacity: .4; }
+  .skBtn.active { border-color: #c26bff; box-shadow: 0 0 12px rgba(194,107,255,.7); }
+  .skBtn .cdMask {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: rgba(10,8,20,.72); color: #c9b8ff;
+    font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+
   /* ============ 升級列 ============ */
   #upgradeBar {
     position: absolute; bottom: 10px; left: 0; right: 0;
@@ -56,11 +81,11 @@
   .upBtn.flash { box-shadow: 0 0 16px 2px rgba(126,240,255,.8); border-color: #7ef0ff; }
 
   #ultBtn {
-    position: absolute; right: 12px; bottom: 84px;
-    width: 74px; height: 74px; border-radius: 50%;
+    position: absolute; right: 12px; bottom: 120px;
+    width: 68px; height: 68px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #ff9d5c, #c8331f 70%);
     border: 2px solid #ffd24d; color: #fff;
-    font-weight: 900; font-size: 13px;
+    font-weight: 900; font-size: 12px;
     display: flex; align-items: center; justify-content: center;
     text-align: center; line-height: 1.2;
     cursor: pointer; user-select: none; z-index: 8;
@@ -121,6 +146,10 @@
   <div id="combo"></div>
   <div id="ultBtn">軌道砲<br>READY</div>
 
+  <!-- 技能商城（金幣購買，有冷卻） -->
+  <div id="skillBar"></div>
+
+  <!-- 永久升級 -->
   <div id="upgradeBar">
     <div class="upBtn" id="btnDmg"><div class="t">⚔️ 火力 Lv.1</div><div class="c">💰 60</div></div>
     <div class="upBtn" id="btnRate"><div class="t">🔥 射速 Lv.1</div><div class="c">💰 60</div></div>
@@ -129,14 +158,14 @@
 
   <div id="startScreen">
     <h1>屍潮狂襲</h1>
-    <div class="sub">3.0 雙 線 無 敵 版</div>
+    <div class="sub">3.1 雙 線 無 敵 版</div>
     <div class="rules">
       屍潮從<span style="color:#ff5c5c">左右兩道</span>分別壓下，速度數量各不同<br>
-      左右拖曳小隊，子彈<span style="color:#ffd24d">直線朝上掃射（不追蹤）</span><br>
-      火力簾只罩得住一側 →「<span style="color:#7ef0ff">要顧哪邊</span>」是你的抉擇<br>
-      看頂端<span style="color:#ff9d2e">威脅指示器</span>判斷屍海道 / 疾襲道<br>
-      兵力跨門檻整隊進化，扇形變寬更好罩<br>
-      殭屍破防：扣金幣、Combo 歸零（但你不會死）
+      子彈<span style="color:#ffd24d">永遠直線朝上（絕不散開）</span>，多兵=多條平行彈道<br>
+      兵力滿 8 就<span style="color:#7ef0ff">整隊晉升軍階</span>，人數重置、火力躍升<br>
+      用金幣買<span style="color:#c26bff">技能</span>：狂暴 / 凍結 / 左右清場<br>
+      Boss 越晚出現血越厚，中央路障分隔兩道<br>
+      殭屍破防扣金幣、Combo 歸零（你不會死）
     </div>
     <button id="startBtn">開 戰</button>
   </div>
@@ -145,31 +174,26 @@
 <script>
 "use strict";
 /* =========================================================
- *  屍潮狂襲 3.0・雙線無敵版
- *  設計核心：左右分流 + 直線不追蹤 + 左右取捨
- *
- *  - 雙車道：左右各自獨立生成，速度/數量/兵種不對稱
- *  - 直線彈幕：士兵橫排，子彈固定角度朝上直射，絕不轉向
- *  - 覆蓋取捨：火力簾只罩小隊正上方，顧左就漏右
- *  - 威脅指示器：頂端顯示各道類型與數量，供判斷
- *  - 難度雙軌：波次 + 存活時間持續拉高屍潮強度
+ *  屍潮狂襲 3.1・雙線無敵版
+ *  本版重點：
+ *   1. 軍階合併封頂 —— 兵力滿 8 晉升、重置回 3，畫面永不塞滿
+ *   2. 純直線武器 —— 每顆子彈固定朝上，多管=平行直線，無散彈/無 AoE
+ *   3. 技能商城 —— 金幣購買主動技能（狂暴/凍結/左右清場），有冷卻
+ *   4. Boss 增厚 —— 每次現身血量再疊加，越晚越肉
+ *   5. 中央路障 —— 黃黑警示條紋物理隔牆
  * ========================================================= */
 
 /* ---------- 畫布 ---------- */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 let W = 0, H = 0, DPR = 1;
-
-// 手機偵測（效能分流：手機降 DPR、關陰影、限制碰撞檢測）
 const isMobile = /Android|webOS|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 function resize() {
   const wrap = document.getElementById("gameWrap");
   DPR = isMobile ? 1.2 : Math.min(window.devicePixelRatio || 1, 2);
-  W = wrap.clientWidth;
-  H = wrap.clientHeight;
-  canvas.width = W * DPR;
-  canvas.height = H * DPR;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 window.addEventListener("resize", resize);
@@ -180,57 +204,52 @@ const rand  = (a, b) => a + Math.random() * (b - a);
 const randi = (a, b) => Math.floor(rand(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
-const UP = -Math.PI / 2;                              // 「朝上」的基準角度（Canvas 座標）
+const UP = -Math.PI / 2;                              // 「垂直朝上」基準角
 
 /* =========================================================
- *  兵種階級表 —— 兵力跨 min 門檻即整隊進化
- *  fireAngles: 相對「垂直朝上」的固定偏角陣列（單位：弧度）
- *              每顆子彈都沿固定方向直線飛，永不追蹤
+ *  軍階表 —— 全部純直線射擊
+ *  barrels: 平行槍管數（並排的直線，非扇形）
+ *  每顆子彈角度永遠 = UP，強化只體現在傷害/射速/穿透/連發
  * ========================================================= */
 const TROOPS = [
-  { min: 1,   name: "民兵",       desc: "生鏽手槍",     bullet: "ball",
-    fireAngles: [0], mode: "normal",
-    color: "#ffe08a", body: "#6b7688", size: 8,  dmg: 6,  rate: 1.7,  speed: 640,
-    pierce: 0, blast: 0,  chain: 0, aura: null },
+  { name: "民兵",       desc: "生鏽手槍",   bullet: "ball",   barrels: 1,
+    dmg: 6,  rate: 1.7, speed: 640,  pierce: 0,  chain: 0, mode: "normal",
+    color: "#ffe08a", body: "#6b7688", size: 8,  aura: null },
 
-  { min: 5,   name: "突擊兵",     desc: "三連發步槍",   bullet: "tracer",
-    fireAngles: [0], mode: "burst3",
-    color: "#8affc1", body: "#3f7ad1", size: 9,  dmg: 5,  rate: 2.1,  speed: 760,
-    pierce: 0, blast: 0,  chain: 0, aura: null },
+  { name: "突擊兵",     desc: "三連發步槍", bullet: "tracer", barrels: 1,
+    dmg: 5,  rate: 2.2, speed: 780,  pierce: 0,  chain: 0, mode: "burst3",
+    color: "#8affc1", body: "#3f7ad1", size: 9,  aura: null },
 
-  { min: 10,  name: "重裝機槍兵", desc: "雙管平行掃射", bullet: "tracer",
-    fireAngles: [-0.045, 0.045], mode: "normal",
-    color: "#ffb35c", body: "#d1662e", size: 10, dmg: 4,  rate: 3.4,  speed: 820,
-    pierce: 0, blast: 0,  chain: 0, aura: null },
+  { name: "重裝機槍兵", desc: "雙管平行掃射", bullet: "tracer", barrels: 2,
+    dmg: 4.5,rate: 3.3, speed: 840,  pierce: 0,  chain: 0, mode: "normal",
+    color: "#ffb35c", body: "#d1662e", size: 10, aura: null },
 
-  { min: 20,  name: "電磁特勤",   desc: "穿透雷射柱",   bullet: "laser",
-    fireAngles: [0], mode: "normal",
-    color: "#7ef0ff", body: "#2ea8c9", size: 10, dmg: 12, rate: 2.3,  speed: 1200,
-    pierce: 6, blast: 0,  chain: 0, aura: "#7ef0ff" },
+  { name: "電磁特勤",   desc: "穿透雷射柱", bullet: "laser",  barrels: 1,
+    dmg: 13, rate: 2.4, speed: 1200, pierce: 6,  chain: 0, mode: "normal",
+    color: "#7ef0ff", body: "#2ea8c9", size: 10, aura: "#7ef0ff" },
 
-  { min: 35,  name: "動力裝甲",   desc: "垂直火箭幕",   bullet: "rocket",
-    fireAngles: [-0.09, 0.09], mode: "normal",
-    color: "#ff7b3a", body: "#c93a2e", size: 12, dmg: 20, rate: 1.3,  speed: 620,
-    pierce: 0, blast: 78, chain: 0, aura: "#ff7b3a" },
+  { name: "動力裝甲",   desc: "重型軌道砲彈", bullet: "rail", barrels: 1,
+    dmg: 28, rate: 1.6, speed: 1000, pierce: 4,  chain: 0, mode: "normal",
+    color: "#ff7b3a", body: "#c93a2e", size: 12, aura: "#ff7b3a" },
 
-  { min: 60,  name: "電漿機甲",   desc: "三向電漿+鏈電", bullet: "plasma",
-    fireAngles: [-0.20, 0, 0.20], mode: "normal",
-    color: "#c26bff", body: "#8f3ad1", size: 13, dmg: 11, rate: 3.0,  speed: 900,
-    pierce: 1, blast: 0,  chain: 2, aura: "#c26bff" },
+  { name: "電漿機甲",   desc: "雙束電漿+鏈電", bullet: "plasma", barrels: 2,
+    dmg: 13, rate: 3.0, speed: 950,  pierce: 2,  chain: 1, mode: "normal",
+    color: "#c26bff", body: "#8f3ad1", size: 13, aura: "#c26bff" },
 
-  { min: 100, name: "殲滅泰坦",   desc: "五向毀滅光矛", bullet: "spear",
-    fireAngles: [-0.42, -0.21, 0, 0.21, 0.42], mode: "normal",
-    color: "#ffe9a8", body: "#e0b64a", size: 15, dmg: 26, rate: 2.6,  speed: 1250,
-    pierce: 8, blast: 55, chain: 0, aura: "#ffd24d" },
+  { name: "殲滅泰坦",   desc: "雙柱毀滅光矛", bullet: "spear",  barrels: 2,
+    dmg: 34, rate: 2.8, speed: 1300, pierce: 12, chain: 0, mode: "normal",
+    color: "#ffe9a8", body: "#e0b64a", size: 15, aura: "#ffd24d" },
 ];
-function troopTier() {
-  let t = 0;
-  for (let i = 0; i < TROOPS.length; i++) if (SQUAD.count >= TROOPS[i].min) t = i;
-  return t;
-}
+const MAX_RANK = TROOPS.length - 1;
+
+/* 軍階晉升參數：兵力封頂機制的核心 */
+const PROMOTE_AT = 8;        // 兵力累到 8 就晉升
+const PROMOTE_RESET = 3;     // 晉升後兵力重置為 3
+const MAX_COUNT_CAP = 10;    // 滿階後兵力硬上限（不佔滿畫面）
+const MAX_VISIBLE = 8;       // 畫面最多顯示 8 個士兵
 
 /* =========================================================
- *  殭屍種類表 —— 腐爛人形設計
+ *  殭屍種類表
  * ========================================================= */
 const ZTYPES = {
   walker:  { hp: 14,  speed: 44,  r: 15, gold: 2,  skin: "#5a7a4a", rot: "#3a5230", eye: "#b8ff5c", label: "蹣跚者" },
@@ -238,66 +257,66 @@ const ZTYPES = {
   tank:    { hp: 90,  speed: 26,  r: 27, gold: 9,  skin: "#6b4a4a", rot: "#4a3030", eye: "#ff5c5c", label: "腫脹巨屍" },
   bomber:  { hp: 18,  speed: 64,  r: 15, gold: 4,  skin: "#8a7a3a", rot: "#5c5226", eye: "#ff9d2e", label: "爆漿屍" },
   ghost:   { hp: 22,  speed: 58,  r: 14, gold: 5,  skin: "#5c5270", rot: "#3a3448", eye: "#c26bff", label: "怨靈" },
-  boss:    { hp: 1500,speed: 15,  r: 54, gold: 280,skin: "#4a2a34", rot: "#2e1a20", eye: "#ff2e6d", label: "深淵屍王" },
+  boss:    { hp: 1200,speed: 15,  r: 54, gold: 300,skin: "#4a2a34", rot: "#2e1a20", eye: "#ff2e6d", label: "深淵屍王" },
 };
 
-/* =========================================================
- *  車道性格表 —— 造成左右不對稱的來源
- *  horde 屍海：間隔短、批量大、速度慢、重型兵種
- *  blitz 疾襲：間隔長、批量小、速度快、輕型兵種
- * ========================================================= */
+/* 車道性格表 */
 const PROFILES = {
   horde: { label: "屍海", color: "#ff5c5c", interval: [0.55, 0.95], batch: [2, 4], spdMul: 0.85, types: ["walker", "tank", "bomber", "walker"] },
   blitz: { label: "疾襲", color: "#ffe45c", interval: [0.95, 1.6],  batch: [1, 2], spdMul: 1.55, types: ["runner", "ghost", "runner"] },
 };
 
+/* =========================================================
+ *  技能商城表 —— 金幣購買主動技能（無敵版定價偏高）
+ *  cost 金幣  cd 冷卻秒數  dur 持續秒數（0=瞬發）
+ * ========================================================= */
+const SKILLS = [
+  { id: "frenzy", name: "狂暴", icon: "⚡", cost: 150, cd: 14, dur: 8,  color: "#ffe45c" },
+  { id: "freeze", name: "凍結", icon: "❄", cost: 220, cd: 18, dur: 5,  color: "#7ef0ff" },
+  { id: "purgeL", name: "左清", icon: "◀",  cost: 200, cd: 15, dur: 0,  color: "#ff7b3a" },
+  { id: "purgeR", name: "右清", icon: "▶",  cost: 200, cd: 15, dur: 0,  color: "#ff7b3a" },
+];
+const skillCd = {};                                   // 各技能剩餘冷卻
+SKILLS.forEach(s => skillCd[s.id] = 0);
+
 /* ---------- 車道幾何 ---------- */
-const LANE_PAD = 26;                                  // 車道內側留白
+const LANE_PAD = 26;
+const BARRIER_W = 16;                                 // 中央路障寬度
 function laneBounds(lane) {
-  // 回傳該車道殭屍可活動的 x 範圍
   return lane === "L"
-    ? { lo: LANE_PAD, hi: W / 2 - LANE_PAD }
-    : { lo: W / 2 + LANE_PAD, hi: W - LANE_PAD };
+    ? { lo: LANE_PAD, hi: W / 2 - BARRIER_W / 2 - LANE_PAD }
+    : { lo: W / 2 + BARRIER_W / 2 + LANE_PAD, hi: W - LANE_PAD };
 }
 
 /* ---------- 遊戲狀態 ---------- */
 const G = {
-  running: false,
-  time: 0,
-  wave: 1,
-  kills: 0,
-  gold: 0,
-  combo: 0, comboTimer: 0,
-  shake: 0, hitStop: 0,
-  roadScroll: 0,
-  ultCd: 0, ultMax: 20,
-  gateTimer: 5,
+  running: false, time: 0, wave: 1, kills: 0, gold: 0,
+  combo: 0, comboTimer: 0, shake: 0, hitStop: 0, roadScroll: 0,
+  ultCd: 0, ultMax: 20, gateTimer: 5,
   waveKillTarget: 16, waveKilled: 0,
-  bossAlive: false, bossPending: false,
-  flashAlpha: 0,
-  dangerAlpha: 0,
-  breachFlashL: 0, breachFlashR: 0,                   // 左右各自的破防紅閃
+  bossAlive: false, bossPending: false, bossCount: 0,   // bossCount 用於 Boss 血量疊加
+  flashAlpha: 0, dangerAlpha: 0, breachFlashL: 0, breachFlashR: 0,
+  freezeT: 0,                                            // 凍結技能剩餘時間
 };
 
-/* 每條車道獨立的生成控制器 */
 const lanes = {
   L: { profile: "horde", spawnTimer: 1.0, count: 0 },
   R: { profile: "blitz", spawnTimer: 1.4, count: 0 },
 };
 
-/* 玩家小隊（單一小隊，只能罩一側 → 左右取捨的核心） */
+/* 玩家小隊：rank 軍階 + count 當前兵力（受封頂機制約束） */
 const SQUAD = {
   x: 0, targetX: 0,
-  count: 1,
+  rank: 0, count: 1,
   dmgLv: 1, rateLv: 1,
   fireTimer: 0, burstQueue: 0, burstTimer: 0,
   costDmg: 60, costRate: 60, costTroop: 90,
-  lastTier: 0,
+  frenzyT: 0,                                          // 狂暴剩餘時間
 };
 
 let zombies = [], bullets = [], particles = [], dmgTexts = [], gates = [], beams = [], decals = [], arcs = [];
 
-/* ---------- 難度曲線（波次 + 時間雙軌） ---------- */
+/* ---------- 難度曲線 ---------- */
 function diffMul() { return (1 + (G.wave - 1) * 0.30) * (1 + G.time / 40 * 0.18); }
 function speedMul() { return 1 + (G.wave - 1) * 0.04 + G.time / 60 * 0.05; }
 
@@ -308,10 +327,22 @@ const hud = {
   troop: $("troopName"), diff: $("diffLabel"),
   combo: $("combo"), ult: $("ultBtn"),
   btnDmg: $("btnDmg"), btnRate: $("btnRate"), btnTroop: $("btnTroop"),
+  skillBar: $("skillBar"),
 };
 
+/* 動態建立技能鈕 */
+const skillBtnEls = {};
+SKILLS.forEach(s => {
+  const el = document.createElement("div");
+  el.className = "skBtn";
+  el.innerHTML = `<div class="i">${s.icon}</div><div class="n">${s.name}</div><div class="c">💰${s.cost}</div><div class="cdMask" style="display:none"></div>`;
+  el.addEventListener("pointerdown", e => { e.stopPropagation(); useSkill(s); });
+  hud.skillBar.appendChild(el);
+  skillBtnEls[s.id] = el;
+});
+
 function refreshHUD() {
-  const tp = TROOPS[troopTier()];
+  const tp = TROOPS[SQUAD.rank];
   hud.wave.textContent = "WAVE " + G.wave;
   hud.kill.textContent = G.kills;
   hud.gold.textContent = G.gold;
@@ -321,24 +352,33 @@ function refreshHUD() {
   hud.btnDmg.querySelector(".c").textContent  = "💰 " + SQUAD.costDmg;
   hud.btnRate.querySelector(".t").textContent = "🔥 射速 Lv." + SQUAD.rateLv;
   hud.btnRate.querySelector(".c").textContent = "💰 " + SQUAD.costRate;
-  hud.btnTroop.querySelector(".t").textContent= "🪖 增兵 x" + SQUAD.count;
+  hud.btnTroop.querySelector(".t").textContent= "🪖 增兵（x" + SQUAD.count + "/8）";
   hud.btnTroop.querySelector(".c").textContent= "💰 " + SQUAD.costTroop;
   hud.btnDmg.classList.toggle("dim",  G.gold < SQUAD.costDmg);
   hud.btnRate.classList.toggle("dim", G.gold < SQUAD.costRate);
   hud.btnTroop.classList.toggle("dim",G.gold < SQUAD.costTroop);
+  // 技能鈕狀態
+  for (const s of SKILLS) {
+    const el = skillBtnEls[s.id];
+    const cd = skillCd[s.id];
+    const mask = el.querySelector(".cdMask");
+    el.classList.toggle("dim", G.gold < s.cost || cd > 0);
+    // 標記持續中的 buff
+    const activeBuff = (s.id === "frenzy" && SQUAD.frenzyT > 0) || (s.id === "freeze" && G.freezeT > 0);
+    el.classList.toggle("active", activeBuff);
+    if (cd > 0) { mask.style.display = "flex"; mask.textContent = cd.toFixed(0) + "s"; }
+    else mask.style.display = "none";
+  }
 }
 
-/* ---------- 升級 ---------- */
+/* ---------- 永久升級 ---------- */
 function buy(btn, kind) {
   if (kind === "dmg" && G.gold >= SQUAD.costDmg) {
-    G.gold -= SQUAD.costDmg; SQUAD.dmgLv++;
-    SQUAD.costDmg = Math.floor(SQUAD.costDmg * 1.42);
+    G.gold -= SQUAD.costDmg; SQUAD.dmgLv++; SQUAD.costDmg = Math.floor(SQUAD.costDmg * 1.42);
   } else if (kind === "rate" && G.gold >= SQUAD.costRate) {
-    G.gold -= SQUAD.costRate; SQUAD.rateLv++;
-    SQUAD.costRate = Math.floor(SQUAD.costRate * 1.42);
+    G.gold -= SQUAD.costRate; SQUAD.rateLv++; SQUAD.costRate = Math.floor(SQUAD.costRate * 1.42);
   } else if (kind === "troop" && G.gold >= SQUAD.costTroop) {
-    G.gold -= SQUAD.costTroop; addTroops(1);
-    SQUAD.costTroop = Math.floor(SQUAD.costTroop * 1.45);
+    G.gold -= SQUAD.costTroop; addTroops(1); SQUAD.costTroop = Math.floor(SQUAD.costTroop * 1.45);
   } else return;
   btn.classList.add("flash");
   setTimeout(() => btn.classList.remove("flash"), 180);
@@ -348,29 +388,82 @@ hud.btnDmg.addEventListener("pointerdown",  e => { e.stopPropagation(); buy(hud.
 hud.btnRate.addEventListener("pointerdown", e => { e.stopPropagation(); buy(hud.btnRate, "rate"); });
 hud.btnTroop.addEventListener("pointerdown",e => { e.stopPropagation(); buy(hud.btnTroop,"troop"); });
 
-/* 增兵 + 兵種進化偵測 */
+/* =========================================================
+ *  增兵 + 軍階晉升（封頂機制）
+ *  兵力滿 PROMOTE_AT → 晉升軍階、兵力重置 → 畫面永不塞滿
+ * ========================================================= */
 function addTroops(n) {
-  SQUAD.count += n;
-  const t = troopTier();
-  if (t > SQUAD.lastTier) {
-    SQUAD.lastTier = t;
-    const tp = TROOPS[t];
-    G.flashAlpha = .7; G.shake = 12;
-    dmgTexts.push({ x: W / 2, y: H * .44, v: "兵種進化！", life: 1.5, text: true, color: tp.color });
-    dmgTexts.push({ x: W / 2, y: H * .44 + 38, v: tp.name + "・" + tp.desc, life: 1.8, text: true, color: "#ffffff", small: true });
-    for (let i = 0; i < 46; i++) {
-      const a = (i / 46) * Math.PI * 2;
-      particles.push({ x: SQUAD.x, y: squadY(), vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, r: rand(2.5, 5), life: .6, max: .6, color: tp.color });
+  for (let i = 0; i < n; i++) {
+    SQUAD.count++;
+    if (SQUAD.count > PROMOTE_AT && SQUAD.rank < MAX_RANK) {
+      SQUAD.rank++;
+      SQUAD.count = PROMOTE_RESET;
+      triggerPromotion();
+    } else if (SQUAD.rank >= MAX_RANK && SQUAD.count > MAX_COUNT_CAP) {
+      SQUAD.count = MAX_COUNT_CAP;                     // 滿階封頂
     }
   }
+}
+
+function triggerPromotion() {
+  const tp = TROOPS[SQUAD.rank];
+  G.flashAlpha = .7; G.shake = 12;
+  dmgTexts.push({ x: W / 2, y: H * .44, v: "軍階晉升！", life: 1.5, text: true, color: tp.color });
+  dmgTexts.push({ x: W / 2, y: H * .44 + 38, v: tp.name + "・" + tp.desc, life: 1.8, text: true, color: "#ffffff", small: true });
+  for (let i = 0; i < 46; i++) {
+    const a = (i / 46) * Math.PI * 2;
+    particles.push({ x: SQUAD.x, y: squadY(), vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, r: rand(2.5, 5), life: .6, max: .6, color: tp.color });
+  }
+}
+
+/* =========================================================
+ *  技能商城
+ * ========================================================= */
+function useSkill(s) {
+  if (!G.running || skillCd[s.id] > 0 || G.gold < s.cost) return;
+  G.gold -= s.cost;
+  skillCd[s.id] = s.cd;
+  const el = skillBtnEls[s.id];
+  el.classList.add("active");
+  setTimeout(() => el.classList.remove("active"), 200);
+
+  switch (s.id) {
+    case "frenzy":                                    // 狂暴：射速暴增
+      SQUAD.frenzyT = s.dur;
+      dmgTexts.push({ x: SQUAD.x, y: squadY() - 40, v: "狂暴！", life: 1.0, text2: true });
+      break;
+    case "freeze":                                    // 凍結：全屍減速
+      G.freezeT = s.dur;
+      G.flashAlpha = .3;
+      dmgTexts.push({ x: W / 2, y: H * .4, v: "❄ 凍結力場 ❄", life: 1.2, text: true, color: "#7ef0ff" });
+      break;
+    case "purgeL":                                    // 左道清場
+      lanePurge("L");
+      break;
+    case "purgeR":                                    // 右道清場
+      lanePurge("R");
+      break;
+  }
+  refreshHUD();
+}
+
+function lanePurge(lane) {
+  G.shake = 18; G.flashAlpha = .5;
+  const cx = lane === "L" ? W * .25 : W * .75;
+  beams.push({ x: cx, w: W / 2 - 20, life: .5, max: .5 });   // 整道光柱
+  for (const z of zombies) {
+    if (z.dead || z.lane !== lane) continue;
+    if (z.type === "boss") hitZombie(z, z.maxHp * 0.25, z.x, z.y, true);
+    else hitZombie(z, 1e9, z.x, z.y, true);
+  }
+  dmgTexts.push({ x: cx, y: H * .4, v: (lane === "L" ? "◀ " : "") + "清場" + (lane === "R" ? " ▶" : ""), life: 1.0, text: true, color: "#ff7b3a" });
 }
 
 /* ---------- 大招 ---------- */
 hud.ult.addEventListener("pointerdown", e => {
   e.stopPropagation();
   if (G.ultCd > 0 || !G.running) return;
-  G.ultCd = G.ultMax;
-  G.flashAlpha = 1; G.shake = 26;
+  G.ultCd = G.ultMax; G.flashAlpha = 1; G.shake = 26;
   for (let i = 0; i < 6; i++) beams.push({ x: rand(W * .1, W * .9), w: rand(30, 70), life: .55, max: .55 });
   for (const z of zombies) {
     if (z.type === "boss") hitZombie(z, z.maxHp * 0.35, z.x, z.y, true);
@@ -378,7 +471,7 @@ hud.ult.addEventListener("pointerdown", e => {
   }
 });
 
-/* ---------- 輸入：左右拖曳小隊 ---------- */
+/* ---------- 輸入 ---------- */
 let dragging = false;
 const wrap = document.getElementById("gameWrap");
 wrap.addEventListener("pointerdown", e => { dragging = true; SQUAD.targetX = e.clientX - wrap.getBoundingClientRect().left; });
@@ -386,14 +479,12 @@ wrap.addEventListener("pointermove", e => { if (dragging) SQUAD.targetX = e.clie
 window.addEventListener("pointerup", () => dragging = false);
 
 /* =========================================================
- *  生成邏輯 —— 雙車道不對稱屍潮
+ *  生成邏輯
  * ========================================================= */
 function rollLaneProfiles() {
-  // 每波隨機決定左右性格，且會左右對調 → 玩家不能永遠只顧一邊
   const heavyLeft = Math.random() < 0.5;
   lanes.L.profile = heavyLeft ? "horde" : "blitz";
   lanes.R.profile = heavyLeft ? "blitz" : "horde";
-  // 每 4 波：雙屍海危機波（兩邊都壓下，逼你瘋狂切換 + 用大招）
   if (G.wave % 4 === 0) { lanes.L.profile = "horde"; lanes.R.profile = "horde"; }
 }
 
@@ -401,19 +492,20 @@ function spawnZombie(type, lane) {
   const t = ZTYPES[type];
   const b = laneBounds(lane);
   const prof = PROFILES[lanes[lane].profile];
+  const isBoss = type === "boss";
+  // Boss 血量隨出現次數疊加：越晚出現越肉
+  const bossMul = isBoss ? (1 + G.bossCount * 0.6) : 1;
+  const hp = t.hp * diffMul() * bossMul;
   zombies.push({
     type, lane,
-    x: type === "boss" ? (lane === "L" ? W * .25 : W * .75) : rand(b.lo + t.r, b.hi - t.r),
+    x: isBoss ? (b.lo + b.hi) / 2 : rand(b.lo + t.r, b.hi - t.r),
     y: -t.r - rand(6, 60),
-    r: t.r * (type === "boss" ? 1 : rand(.9, 1.1)),
-    hp: t.hp * diffMul(), maxHp: t.hp * diffMul(),
+    r: t.r * (isBoss ? 1 : rand(.9, 1.1)),
+    hp, maxHp: hp,
     speed: t.speed * speedMul() * prof.spdMul * rand(.9, 1.1),
     skin: t.skin, rot: t.rot, eye: t.eye, gold: t.gold,
-    wob: rand(0, Math.PI * 2),
-    tilt: rand(-.25, .25),
-    lean: rand(.05, .2),
-    hitFlash: 0,
-    driftDir: Math.random() < .5 ? -1 : 1,
+    wob: rand(0, Math.PI * 2), tilt: rand(-.25, .25), lean: rand(.05, .2),
+    hitFlash: 0, driftDir: Math.random() < .5 ? -1 : 1,
     stains: Array.from({ length: randi(2, 4) }, () => ({
       ox: rand(-.5, .5), oy: rand(-.4, .5), r: rand(.15, .35),
       c: Math.random() < .5 ? "rgba(90,20,20,.55)" : "rgba(30,45,20,.5)"
@@ -421,7 +513,6 @@ function spawnZombie(type, lane) {
   });
 }
 
-/* 各車道獨立跑生成計時器 */
 function updateLaneSpawns(dt) {
   if (G.bossAlive) return;
   for (const key of ["L", "R"]) {
@@ -429,25 +520,20 @@ function updateLaneSpawns(dt) {
     const prof = PROFILES[lane.profile];
     lane.spawnTimer -= dt;
     if (lane.spawnTimer <= 0) {
-      // 間隔隨波次縮短，屍海道天生更密
-      const baseInt = rand(prof.interval[0], prof.interval[1]);
-      lane.spawnTimer = clamp(baseInt - G.wave * 0.03, 0.3, 1.6);
+      lane.spawnTimer = clamp(rand(prof.interval[0], prof.interval[1]) - G.wave * 0.03, 0.3, 1.6);
       const batch = randi(prof.batch[0], prof.batch[1]) + Math.floor(G.wave / 4);
-      for (let i = 0; i < batch; i++) {
-        spawnZombie(prof.types[randi(0, prof.types.length - 1)], key);
-      }
+      for (let i = 0; i < batch; i++) spawnZombie(prof.types[randi(0, prof.types.length - 1)], key);
     }
   }
 }
 
-/* 增益門：一次只從單一車道降下，選了這道就得離開另一道 */
 function spawnGate() {
   const lane = Math.random() < 0.5 ? "L" : "R";
   const b = laneBounds(lane);
   const kinds = ["troop+", "troopx", "power"];
   const k = kinds[randi(0, 2)];
   let payload;
-  if (k === "troop+") { const v = randi(3, 7); payload = { k, v, label: "+" + v + " 兵" }; }
+  if (k === "troop+") { const v = randi(3, 6); payload = { k, v, label: "+" + v + " 兵" }; }
   else if (k === "troopx") { payload = { k, v: 2, label: "x2 兵" }; }
   else { payload = { k: "power", v: 2, label: "火力⬆⬆" }; }
   gates.push({ lane, x0: b.lo - LANE_PAD * .5, x1: b.hi + LANE_PAD * .5, y: -50, h: 62, ...payload, used: false });
@@ -460,7 +546,7 @@ function hitZombie(z, dmg, hx, hy, silent) {
   z.hp -= dmg;
   z.hitFlash = 0.08;
   if (!silent) {
-    const tp = TROOPS[troopTier()];
+    const tp = TROOPS[SQUAD.rank];
     dmgTexts.push({ x: hx + rand(-8, 8), y: hy, v: Math.round(dmg), life: .6,
                     crit: dmg > tp.dmg * SQUAD.dmgLv * 4 });
   }
@@ -473,23 +559,16 @@ function killZombie(z) {
   G.combo++; G.comboTimer = 2.0;
   if (z.type !== "boss") G.waveKilled++;
 
-  // 地面血泊
   decals.push({ x: z.x, y: z.y, r: z.r * rand(1.1, 1.5), life: 9, max: 9,
                 lobes: Array.from({ length: 4 }, () => ({ a: rand(0, Math.PI * 2), d: rand(.3, .7), r: rand(.3, .55) })) });
   if (decals.length > 40) decals.shift();
 
-  // 爆漿粒子：血 + 腐肉
   const n = z.type === "boss" ? 110 : 20;
   for (let i = 0; i < n; i++) {
     const a = rand(0, Math.PI * 2), sp = rand(40, z.type === "boss" ? 440 : 280);
-    particles.push({
-      x: z.x, y: z.y,
-      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
-      r: rand(2, z.type === "boss" ? 7 : 4.5),
-      life: rand(.35, .8), max: .8,
-      color: Math.random() < .55 ? "#7a1a1a" : (Math.random() < .5 ? z.skin : z.eye),
-      grav: true,
-    });
+    particles.push({ x: z.x, y: z.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+      r: rand(2, z.type === "boss" ? 7 : 4.5), life: rand(.35, .8), max: .8,
+      color: Math.random() < .55 ? "#7a1a1a" : (Math.random() < .5 ? z.skin : z.eye), grav: true });
   }
 
   if (z.type === "bomber") {
@@ -507,57 +586,50 @@ function killZombie(z) {
 }
 
 /* =========================================================
- *  開火系統 —— 直線彈幕（絕不追蹤）
+ *  開火 —— 純直線彈幕（每顆角度永遠 = UP）
  * ========================================================= */
-function squadY() { return H - 132; }
+function squadY() { return H - 168; }                 // 上移，讓出技能列空間
 
-/* 橫排編隊：士兵排成一整排（多的話堆疊多排），形成往上的彈幕簾 */
+/* 橫排編隊：最多 8 人（2 排 x4），畫面不塞滿 */
 function soldierPositions() {
-  const show = Math.min(SQUAD.count, 15);
-  const perRow = Math.min(show, 7);                   // 每排最多 7 人
+  const show = Math.min(SQUAD.count, MAX_VISIBLE);
+  const perRow = 4;
   const rows = Math.ceil(show / perRow);
   const out = [];
   let idx = 0;
   for (let r = 0; r < rows; r++) {
     const inThis = Math.min(perRow, show - idx);
     for (let c = 0; c < inThis; c++, idx++) {
-      const ox = (c - (inThis - 1) / 2) * 26;
-      out.push({ x: SQUAD.x + ox, y: squadY() + r * 22 });
+      out.push({ x: SQUAD.x + (c - (inThis - 1) / 2) * 28, y: squadY() + r * 22 });
     }
   }
   return out;
 }
 
-/* 產生一顆直線子彈：angle 為固定飛行方向，射出後不再改變 */
-function makeBullet(px, py, angle, tp) {
-  const dmgBase = tp.dmg * (1 + (SQUAD.dmgLv - 1) * 0.22);
+function makeBullet(px, py, tp) {
+  const dmgMul = SQUAD.frenzyT > 0 ? 1 : 1;           // 狂暴只加射速，傷害不變（保平衡）
+  const dmgBase = tp.dmg * (1 + (SQUAD.dmgLv - 1) * 0.22) * dmgMul;
+  // 角度固定朝上（UP），射出後純直線飛，永不轉向、永不散開
   bullets.push({
-    x: px, y: py,
-    vx: Math.cos(angle) * tp.speed, vy: Math.sin(angle) * tp.speed,
-    angle,
-    dmg: dmgBase,
-    pierce: tp.pierce, blast: tp.blast, chain: tp.chain,
-    color: tp.color, kind: tp.bullet,
-    trail: [], t: 0,
+    x: px, y: py, vx: 0, vy: Math.sin(UP) * tp.speed,
+    angle: UP, dmg: dmgBase,
+    pierce: tp.pierce, chain: tp.chain,
+    color: tp.color, kind: tp.bullet, trail: [], t: 0,
   });
 }
 
-/* 一次齊射：每個士兵依兵種的固定偏角陣列朝上直射 */
 function volleyFire(tp) {
   const positions = soldierPositions();
-  const shooters = Math.min(positions.length, 12);    // 齊射士兵上限（效能保護）
-  for (let s = 0; s < shooters; s++) {
+  for (let s = 0; s < positions.length; s++) {
     const p = positions[s];
-    for (const off of tp.fireAngles) {
-      const jit = rand(-0.02, 0.02);                  // 微抖動，視覺自然（仍是直線）
-      makeBullet(p.x, p.y, UP + off + jit, tp);
+    for (let bi = 0; bi < tp.barrels; bi++) {
+      const ox = tp.barrels > 1 ? (bi - (tp.barrels - 1) / 2) * 8 : 0;  // 平行槍管間距（仍是直線）
+      makeBullet(p.x + ox, p.y, tp);
     }
-    // 槍口焰
     particles.push({ x: p.x, y: p.y - 8, vx: rand(-25, 25), vy: -rand(70, 130), r: rand(2, 4), life: .1, max: .1, color: tp.color });
   }
 }
 
-/* 鏈狀閃電：命中時彈跳至附近殭屍 */
 function chainLightning(fromZ, dmg, remaining, color) {
   if (remaining <= 0) return;
   let next = null, best = 150 * 150;
@@ -578,8 +650,12 @@ function chainLightning(fromZ, dmg, remaining, color) {
 function update(dt) {
   G.time += dt;
   G.roadScroll = (G.roadScroll + dt * 90) % 80;
-
   if (G.hitStop > 0) { G.hitStop -= dt; dt *= 0.15; }
+
+  // 技能計時器
+  if (SQUAD.frenzyT > 0) SQUAD.frenzyT = Math.max(0, SQUAD.frenzyT - dt);
+  if (G.freezeT > 0) G.freezeT = Math.max(0, G.freezeT - dt);
+  for (const s of SKILLS) if (skillCd[s.id] > 0) skillCd[s.id] = Math.max(0, skillCd[s.id] - dt);
 
   if (G.ultCd > 0) G.ultCd = Math.max(0, G.ultCd - dt);
   hud.ult.classList.toggle("cool", G.ultCd > 0);
@@ -592,12 +668,12 @@ function update(dt) {
     hud.combo.style.transform = `translateX(-50%) scale(${1 + Math.min(G.combo, 40) * 0.01})`;
   }
 
-  // 小隊平滑跟隨手指（全寬移動）
   SQUAD.x += (clamp(SQUAD.targetX, 40, W - 40) - SQUAD.x) * Math.min(1, dt * 12);
 
-  /* --- 開火（含 burst 佇列） --- */
-  const tp = TROOPS[troopTier()];
-  const interval = 1 / (1.7 * tp.rate * (1 + (SQUAD.rateLv - 1) * 0.15));
+  /* --- 開火（射速受狂暴加成） --- */
+  const tp = TROOPS[SQUAD.rank];
+  const rateMul = SQUAD.frenzyT > 0 ? 2.3 : 1;
+  const interval = 1 / (1.7 * tp.rate * (1 + (SQUAD.rateLv - 1) * 0.15) * rateMul);
   SQUAD.fireTimer -= dt;
   if (SQUAD.fireTimer <= 0 && zombies.length) {
     SQUAD.fireTimer = interval;
@@ -609,16 +685,15 @@ function update(dt) {
     if (SQUAD.burstTimer <= 0) { SQUAD.burstTimer = 0.06; SQUAD.burstQueue--; volleyFire(tp); }
   }
 
-  /* --- 雙車道生成 --- */
   updateLaneSpawns(dt);
 
   // 波次推進
   if (G.waveKilled >= G.waveKillTarget && !G.bossAlive) {
     if (G.wave % 5 === 0 && !G.bossPending) {
       G.bossPending = true; G.bossAlive = true;
-      spawnZombie("boss", "L");
-      spawnZombie("boss", "R");                        // Boss 波：左右各一隻屍王
-      dmgTexts.push({ x: W / 2, y: H * .3, v: "⚠ 雙屍王現身 ⚠", life: 1.8, text: true, color: "#ff2e6d" });
+      G.bossCount++;                                  // Boss 出現次數 +1 → 下次更肉
+      spawnZombie("boss", Math.random() < .5 ? "L" : "R");
+      dmgTexts.push({ x: W / 2, y: H * .3, v: "⚠ 深淵屍王現身 ⚠", life: 1.8, text: true, color: "#ff2e6d" });
     } else if (G.wave % 5 !== 0) {
       advanceWave();
     }
@@ -627,30 +702,26 @@ function update(dt) {
   G.gateTimer -= dt;
   if (G.gateTimer <= 0) { G.gateTimer = rand(6.5, 10); spawnGate(); }
 
-  /* --- 殭屍更新（蹣跚步態 + 車道約束 + 破防懲罰） --- */
+  /* --- 殭屍更新（凍結減速 + 車道約束 + 破防懲罰） --- */
   const fenceY = H - 96;
+  const freezeMul = G.freezeT > 0 ? 0.32 : 1;         // 凍結時全屍減速
   lanes.L.count = 0; lanes.R.count = 0;
   let nearestYL = 0, nearestYR = 0;
   for (const z of zombies) {
     if (z.dead) continue;
     lanes[z.lane].count++;
-    z.wob += dt * (z.type === "runner" ? 11 : 6);
-    // 蹣跚脈衝：一步一頓（疾屍除外，牠是狂奔）
+    z.wob += dt * (z.type === "runner" ? 11 : 6) * freezeMul;
     const lurch = z.type === "runner" ? 1 : (0.45 + 0.9 * Math.max(0, Math.sin(z.wob * 1.5)));
-    z.y += z.speed * lurch * dt;
-    // 車道內橫向漂移，但夾在自己車道範圍內（不跨線）
+    z.y += z.speed * lurch * freezeMul * dt;
     const b = laneBounds(z.lane);
-    if (z.type === "ghost") z.x += Math.sin(z.wob * .7) * 55 * dt * z.driftDir;
+    if (z.type === "ghost") z.x += Math.sin(z.wob * .7) * 55 * dt * z.driftDir * freezeMul;
     else z.x += Math.sin(z.wob) * 8 * dt;
     z.x = clamp(z.x, b.lo + z.r, b.hi - z.r);
     if (z.hitFlash > 0) z.hitFlash -= dt;
-    if (z.lane === "L") nearestYL = Math.max(nearestYL, z.y);
-    else nearestYR = Math.max(nearestYR, z.y);
-    // 破防：汽化但懲罰（無敵版緊張感來源）
+    if (z.lane === "L") nearestYL = Math.max(nearestYL, z.y); else nearestYR = Math.max(nearestYR, z.y);
     if (z.y + z.r >= fenceY) {
       z.dead = true;
-      G.gold = Math.max(0, G.gold - 5);
-      G.combo = 0;
+      G.gold = Math.max(0, G.gold - 5); G.combo = 0;
       if (z.lane === "L") G.breachFlashL = .5; else G.breachFlashR = .5;
       G.shake = Math.max(G.shake, 7);
       dmgTexts.push({ x: z.x, y: fenceY - 20, v: "-5💰 破防!", life: .8, crit: true });
@@ -660,38 +731,25 @@ function update(dt) {
       }
     }
   }
-  // 危險警戒：取左右較逼近者
   const nearestY = Math.max(nearestYL, nearestYR);
   const dangerT = clamp((nearestY - H * .55) / (fenceY - H * .55), 0, 1);
   G.dangerAlpha += (dangerT * .5 - G.dangerAlpha) * Math.min(1, dt * 5);
   if (G.breachFlashL > 0) G.breachFlashL -= dt;
   if (G.breachFlashR > 0) G.breachFlashR -= dt;
 
-  /* --- 子彈更新（直線飛行，命中偵測） --- */
+  /* --- 子彈（純直線） --- */
   for (const b of bullets) {
     b.t += dt;
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > (b.kind === "spear" ? 10 : 6)) b.trail.shift();
-    b.x += b.vx * dt; b.y += b.vy * dt;                // 純直線，永不轉向
-    if (b.x < -40 || b.x > W + 40 || b.y < -60 || b.y > H + 40) { b.dead = true; continue; }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.y < -60) { b.dead = true; continue; }
     const checkZombies = isMobile ? zombies.slice(0, Math.min(30, zombies.length)) : zombies;
     for (const z of checkZombies) {
       if (z.dead || (b.hitSet && b.hitSet.has(z))) continue;
       if (dist2(b.x, b.y, z.x, z.y) < (z.r + 5) ** 2) {
         hitZombie(z, b.dmg, b.x, b.y);
         if (b.chain > 0) chainLightning(z, b.dmg, b.chain, b.color);
-        if (b.blast > 0) {
-          G.shake = Math.max(G.shake, b.kind === "rocket" ? 8 : 5);
-          const smoke = b.kind === "rocket" ? 22 : 12;
-          for (let i = 0; i < smoke; i++) {
-            const a = rand(0, Math.PI * 2), sp = rand(50, 260);
-            particles.push({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (b.kind === "rocket" ? 60 : 0),
-                             r: rand(3, b.kind === "rocket" ? 8 : 5), life: rand(.25, .5), max: .5,
-                             color: Math.random() < .5 ? b.color : "#5c5c66" });
-          }
-          for (const o of zombies)
-            if (o !== z && !o.dead && dist2(o.x, o.y, b.x, b.y) < b.blast ** 2) hitZombie(o, b.dmg * .6, o.x, o.y);
-        }
         if (b.pierce > 0) { b.pierce--; (b.hitSet ||= new Set()).add(z); }
         else b.dead = true;
         break;
@@ -699,22 +757,19 @@ function update(dt) {
     }
   }
 
-  /* --- 增益門（單車道降下） --- */
+  /* --- 增益門 --- */
   for (const g of gates) {
     g.y += 68 * dt;
     if (g.y > H) g.dead = true;
     if (g.used) continue;
-    // 小隊必須在該門所屬車道的 x 範圍內、且 y 帶重疊，才吃得到
     if (g.y + g.h >= squadY() - 10 && g.y <= squadY() + 30 && SQUAD.x >= g.x0 && SQUAD.x <= g.x1) {
-      g.used = true; g.dead = true;
-      applyGate(g);
+      g.used = true; g.dead = true; applyGate(g);
     }
   }
 
-  /* --- 粒子 / 文字 / 光柱 / 電弧 / 血泊 --- */
+  /* --- 其他實體 --- */
   for (const p of particles) {
-    p.life -= dt;
-    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
     if (p.grav) p.vy += 420 * dt;
     p.vx *= (1 - dt * 2.2);
     if (p.life <= 0) p.dead = true;
@@ -726,14 +781,14 @@ function update(dt) {
   if (G.flashAlpha > 0) G.flashAlpha = Math.max(0, G.flashAlpha - dt * 2.2);
   if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 40);
 
-  zombies  = zombies.filter(z => !z.dead);
-  bullets  = bullets.filter(b => !b.dead);
-  gates    = gates.filter(g => !g.dead);
+  zombies = zombies.filter(z => !z.dead);
+  bullets = bullets.filter(b => !b.dead);
+  gates = gates.filter(g => !g.dead);
   dmgTexts = dmgTexts.filter(d => !d.dead);
-  beams    = beams.filter(b => !b.dead);
-  arcs     = arcs.filter(a => !a.dead);
-  decals   = decals.filter(d => !d.dead);
-  particles= particles.filter(p => !p.dead);
+  beams = beams.filter(b => !b.dead);
+  arcs = arcs.filter(a => !a.dead);
+  decals = decals.filter(d => !d.dead);
+  particles = particles.filter(p => !p.dead);
   const maxP = isMobile ? 400 : 800;
   while (particles.length > maxP) particles.pop();
 
@@ -750,12 +805,10 @@ function applyGate(g) {
 
 function advanceWave() {
   G.wave++;
-  G.waveKilled = 0;
-  G.bossPending = false;
+  G.waveKilled = 0; G.bossPending = false;
   G.waveKillTarget = 16 + G.wave * 4;
-  rollLaneProfiles();                                 // 換波 → 重擲左右性格
+  rollLaneProfiles();
   dmgTexts.push({ x: W / 2, y: H * .35, v: "WAVE " + G.wave, life: 1.4, text: true, color: "#7ef0ff" });
-  // 顯示本波左右性格提示
   const pL = PROFILES[lanes.L.profile], pR = PROFILES[lanes.R.profile];
   dmgTexts.push({ x: W * .25, y: H * .35 + 40, v: "◀ " + pL.label, life: 1.4, text: true, color: pL.color, small: true });
   dmgTexts.push({ x: W * .75, y: H * .35 + 40, v: pR.label + " ▶", life: 1.4, text: true, color: pR.color, small: true });
@@ -776,11 +829,13 @@ function draw() {
   drawBullets();
   drawArcs();
   drawSquad();
+  drawBarrier();                                       // 中央路障（畫在士兵之後蓋住交界）
   drawFence();
   drawParticles();
   drawBeams();
   drawThreatIndicators();
   drawDmgTexts();
+  if (G.freezeT > 0) drawFreezeTint();
 
   ctx.restore();
 
@@ -793,37 +848,48 @@ function draw() {
 
 function drawRoad() {
   const grd = ctx.createLinearGradient(0, 0, 0, H);
-  grd.addColorStop(0, "#0e1018");
-  grd.addColorStop(1, "#181c28");
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
-
-  // 兩道車道微色差（左偏冷、右偏暖），凸顯分流
-  ctx.fillStyle = "rgba(80,120,200,.04)";
-  ctx.fillRect(0, 0, W / 2, H);
-  ctx.fillStyle = "rgba(200,120,80,.04)";
-  ctx.fillRect(W / 2, 0, W / 2, H);
-
-  // 車道虛線
-  ctx.strokeStyle = "rgba(255,255,255,.07)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([26, 50]);
-  ctx.lineDashOffset = -G.roadScroll * 3;
-  for (const lx of [W * .25, W * .75]) {
-    ctx.beginPath(); ctx.moveTo(lx, -80); ctx.lineTo(lx, H); ctx.stroke();
-  }
+  grd.addColorStop(0, "#0e1018"); grd.addColorStop(1, "#181c28");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(80,120,200,.04)"; ctx.fillRect(0, 0, W / 2, H);
+  ctx.fillStyle = "rgba(200,120,80,.04)"; ctx.fillRect(W / 2, 0, W / 2, H);
+  ctx.strokeStyle = "rgba(255,255,255,.07)"; ctx.lineWidth = 3;
+  ctx.setLineDash([26, 50]); ctx.lineDashOffset = -G.roadScroll * 3;
+  for (const lx of [W * .25, W * .75]) { ctx.beginPath(); ctx.moveTo(lx, -80); ctx.lineTo(lx, H); ctx.stroke(); }
   ctx.setLineDash([]);
+}
 
-  // 中央霓虹分隔線（左右分流的視覺主軸）
-  const pulse = 0.5 + Math.sin(G.time * 3) * 0.5;
+/* 中央路障：黃黑警示條紋物理隔牆（捲動） */
+function drawBarrier() {
+  const cx = W / 2, hw = BARRIER_W / 2;
   ctx.save();
-  if (!isMobile) { ctx.shadowColor = "#ff5c8a"; ctx.shadowBlur = 12 + pulse * 8; }
-  ctx.strokeStyle = `rgba(255,92,138,${0.35 + pulse * .3})`;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([12, 14]);
-  ctx.lineDashOffset = G.roadScroll * 2;
-  ctx.beginPath(); ctx.moveTo(W / 2, -20); ctx.lineTo(W / 2, H); ctx.stroke();
-  ctx.setLineDash([]);
+  // 金屬底座
+  const grd = ctx.createLinearGradient(cx - hw, 0, cx + hw, 0);
+  grd.addColorStop(0, "#1a1d26"); grd.addColorStop(.5, "#3a3f4e"); grd.addColorStop(1, "#1a1d26");
+  ctx.fillStyle = grd;
+  ctx.fillRect(cx - hw, 0, BARRIER_W, H);
+  // 黃黑警示斜紋（往下捲動）
+  ctx.save();
+  ctx.beginPath(); ctx.rect(cx - hw, 0, BARRIER_W, H); ctx.clip();
+  const stripe = 16, off = (G.roadScroll * 2) % (stripe * 2);
+  for (let y = -stripe * 2; y < H + stripe * 2; y += stripe * 2) {
+    ctx.fillStyle = "#e8c020";
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, y + off);
+    ctx.lineTo(cx + hw, y + off + BARRIER_W);
+    ctx.lineTo(cx + hw, y + off + BARRIER_W + stripe);
+    ctx.lineTo(cx - hw, y + off + stripe);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  // 分段鉚接橫線
+  ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 2;
+  for (let y = (G.roadScroll * 3) % 60 - 60; y < H; y += 60) {
+    ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx + hw, y); ctx.stroke();
+  }
+  // 邊緣霓虹描邊
+  if (!isMobile) { ctx.shadowColor = "#ff5c8a"; ctx.shadowBlur = 8; }
+  ctx.strokeStyle = "rgba(255,120,150,.6)"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(cx - hw, 0, BARRIER_W, H);
   ctx.restore();
 }
 
@@ -844,14 +910,11 @@ function drawFence() {
   const pulse = 0.5 + Math.sin(G.time * 6) * 0.5;
   ctx.save();
   if (!isMobile) { ctx.shadowColor = "#7ef0ff"; ctx.shadowBlur = 16 + pulse * 12; }
-  ctx.strokeStyle = `rgba(126,240,255,${0.7 + pulse * .3})`;
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(126,240,255,${0.7 + pulse * .3})`; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  ctx.strokeStyle = `rgba(255,255,255,${0.2 + pulse * .3})`;
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = `rgba(255,255,255,${0.2 + pulse * .3})`; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, y + 5); ctx.lineTo(W, y + 5); ctx.stroke();
   ctx.restore();
-  // 左右各自的破防紅閃
   if (G.breachFlashL > 0) { ctx.fillStyle = `rgba(255,40,40,${G.breachFlashL * .5})`; ctx.fillRect(0, y - 4, W / 2, 12); }
   if (G.breachFlashR > 0) { ctx.fillStyle = `rgba(255,40,40,${G.breachFlashR * .5})`; ctx.fillRect(W / 2, y - 4, W / 2, 12); }
 }
@@ -860,16 +923,11 @@ function drawGates() {
   for (const g of gates) {
     ctx.save();
     const grd = ctx.createLinearGradient(0, g.y, 0, g.y + g.h);
-    grd.addColorStop(0, "rgba(77,184,255,.05)");
-    grd.addColorStop(.5, "rgba(77,184,255,.28)");
-    grd.addColorStop(1, "rgba(77,184,255,.05)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(g.x0, g.y, g.x1 - g.x0, g.h);
-    ctx.strokeStyle = "rgba(126,240,255,.85)";
-    ctx.lineWidth = 2;
+    grd.addColorStop(0, "rgba(77,184,255,.05)"); grd.addColorStop(.5, "rgba(77,184,255,.28)"); grd.addColorStop(1, "rgba(77,184,255,.05)");
+    ctx.fillStyle = grd; ctx.fillRect(g.x0, g.y, g.x1 - g.x0, g.h);
+    ctx.strokeStyle = "rgba(126,240,255,.85)"; ctx.lineWidth = 2;
     ctx.strokeRect(g.x0, g.y, g.x1 - g.x0, g.h);
-    ctx.fillStyle = "#eaf7ff";
-    ctx.font = "900 22px 'Noto Sans TC', sans-serif";
+    ctx.fillStyle = "#eaf7ff"; ctx.font = "900 22px 'Noto Sans TC', sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (!isMobile) { ctx.shadowColor = "#4db8ff"; ctx.shadowBlur = 12; }
     ctx.fillText(g.label, (g.x0 + g.x1) / 2, g.y + g.h / 2);
@@ -877,9 +935,7 @@ function drawGates() {
   }
 }
 
-/* =========================================================
- *  殭屍繪製 —— 腐爛人形
- * ========================================================= */
+/* 殭屍繪製（腐爛人形，同前版） */
 function drawZombies() {
   for (const z of zombies) {
     const wob = Math.sin(z.wob) * 3;
@@ -888,10 +944,8 @@ function drawZombies() {
     ctx.translate(z.x + wob * .4, z.y);
     ctx.rotate(z.tilt * .4 + lurchTilt);
     const r = z.r;
-
     if (z.type === "ghost") ctx.globalAlpha = .72;
 
-    /* 軀幹：駝背不規則形 */
     ctx.fillStyle = z.hitFlash > 0 ? "#e8e8e8" : z.skin;
     ctx.beginPath();
     ctx.moveTo(-r * .7, -r * .2);
@@ -901,58 +955,35 @@ function drawZombies() {
     ctx.quadraticCurveTo(0, -r * (.55 + z.lean), -r * .7, -r * .2);
     ctx.fill();
 
-    /* 破爛衣物色塊 */
     ctx.fillStyle = "rgba(20,24,32,.55)";
     ctx.beginPath();
-    ctx.moveTo(-r * .55, r * .1);
-    ctx.lineTo(r * .1, r * .05);
-    ctx.lineTo(r * .3, r * .8);
-    ctx.lineTo(-r * .2, r * .95);
-    ctx.lineTo(-r * .6, r * .55);
-    ctx.fill();
+    ctx.moveTo(-r * .55, r * .1); ctx.lineTo(r * .1, r * .05); ctx.lineTo(r * .3, r * .8);
+    ctx.lineTo(-r * .2, r * .95); ctx.lineTo(-r * .6, r * .55); ctx.fill();
 
-    /* 腐斑 / 血漬 */
     for (const st of z.stains) {
       ctx.fillStyle = st.c;
-      ctx.beginPath();
-      ctx.arc(st.ox * r, st.oy * r, st.r * r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(st.ox * r, st.oy * r, st.r * r, 0, Math.PI * 2); ctx.fill();
     }
 
-    /* 雙臂前撲 + 爪 */
     ctx.strokeStyle = z.hitFlash > 0 ? "#e8e8e8" : z.rot;
-    ctx.lineWidth = r * .26;
-    ctx.lineCap = "round";
+    ctx.lineWidth = r * .26; ctx.lineCap = "round";
     const armSwing = Math.sin(z.wob * 1.5) * r * .18;
-    ctx.beginPath();
-    ctx.moveTo(-r * .6, -r * .05);
-    ctx.quadraticCurveTo(-r * 1.0, r * .5, -r * .95, r * 1.05 + armSwing);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(r * .6, -r * .05);
-    ctx.quadraticCurveTo(r * 1.0, r * .5, r * .95, r * 1.05 - armSwing);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r * .6, -r * .05); ctx.quadraticCurveTo(-r, r * .5, -r * .95, r * 1.05 + armSwing); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * .6, -r * .05); ctx.quadraticCurveTo(r, r * .5, r * .95, r * 1.05 - armSwing); ctx.stroke();
     ctx.lineWidth = r * .08;
     for (const side of [-1, 1]) {
       const hx = side * r * .95, hy = r * 1.05 + (side < 0 ? armSwing : -armSwing);
-      for (let f = -1; f <= 1; f++) {
-        ctx.beginPath();
-        ctx.moveTo(hx, hy);
-        ctx.lineTo(hx + f * r * .12, hy + r * .22);
-        ctx.stroke();
-      }
+      for (let f = -1; f <= 1; f++) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + f * r * .12, hy + r * .22); ctx.stroke(); }
     }
 
-    /* 頭：歪斜 + 空洞眼 + 裂顎 */
     ctx.save();
-    ctx.translate(0, -r * (.55 + z.lean));
-    ctx.rotate(z.tilt);
+    ctx.translate(0, -r * (.55 + z.lean)); ctx.rotate(z.tilt);
     const hr = r * .48;
     ctx.fillStyle = z.hitFlash > 0 ? "#e8e8e8" : z.skin;
     ctx.beginPath(); ctx.arc(0, 0, hr, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#0a0a0f";
     ctx.beginPath(); ctx.arc(-hr * .38, -hr * .1, hr * .26, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc( hr * .38, -hr * .1, hr * .26, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hr * .38, -hr * .1, hr * .26, 0, Math.PI * 2); ctx.fill();
     ctx.save();
     if (!isMobile) { ctx.shadowColor = z.eye; ctx.shadowBlur = 8; }
     ctx.fillStyle = z.eye;
@@ -965,29 +996,16 @@ function drawZombies() {
     ctx.lineTo(hr * .1, hr * .42);
     ctx.lineTo(hr * .4, hr * .6 + Math.sin(z.wob * 2) * hr * .1);
     ctx.lineTo(hr * .55, hr * .3);
-    ctx.quadraticCurveTo(0, hr * .9, -hr * .5, hr * .35);
-    ctx.fill();
+    ctx.quadraticCurveTo(0, hr * .9, -hr * .5, hr * .35); ctx.fill();
     ctx.restore();
 
-    /* 種類特徵 */
     if (z.type === "runner") {
-      ctx.strokeStyle = `rgba(255,228,92,.3)`;
-      ctx.lineWidth = 2;
-      for (let i = 1; i <= 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-r * .4, -r * .3 - i * 5);
-        ctx.lineTo(-r * .4 + rand(-2, 2), -r * .3 - i * 5 - 14);
-        ctx.stroke();
-      }
+      ctx.strokeStyle = "rgba(255,228,92,.3)"; ctx.lineWidth = 2;
+      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(-r * .4, -r * .3 - i * 5); ctx.lineTo(-r * .4 + rand(-2, 2), -r * .3 - i * 5 - 14); ctx.stroke(); }
     }
     if (z.type === "tank") {
-      ctx.strokeStyle = "#c9b8a8";
-      ctx.lineWidth = r * .07;
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(0, r * .15 + i * r * .2, r * .5, Math.PI * .15, Math.PI * .85);
-        ctx.stroke();
-      }
+      ctx.strokeStyle = "#c9b8a8"; ctx.lineWidth = r * .07;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, r * .15 + i * r * .2, r * .5, Math.PI * .15, Math.PI * .85); ctx.stroke(); }
     }
     if (z.type === "bomber") {
       const pulse = .5 + Math.sin(G.time * 8 + z.wob) * .5;
@@ -1012,8 +1030,7 @@ function drawZombies() {
         ctx.beginPath();
         ctx.moveTo(i * r * .3 - r * .1, -r * .85);
         ctx.lineTo(i * r * .3, -r * 1.35 - Math.abs(i) * -r * .08);
-        ctx.lineTo(i * r * .3 + r * .1, -r * .85);
-        ctx.fill();
+        ctx.lineTo(i * r * .3 + r * .1, -r * .85); ctx.fill();
       }
       ctx.save();
       if (!isMobile) { ctx.shadowColor = z.eye; ctx.shadowBlur = 14; }
@@ -1022,26 +1039,19 @@ function drawZombies() {
       ctx.restore();
       const bw = 130;
       ctx.rotate(-(z.tilt * .4 + lurchTilt));
-      ctx.fillStyle = "rgba(0,0,0,.6)";
-      ctx.fillRect(-bw / 2, -r - 40, bw, 9);
-      ctx.fillStyle = "#ff2e6d";
-      ctx.fillRect(-bw / 2, -r - 40, bw * clamp(z.hp / z.maxHp, 0, 1), 9);
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
-      ctx.strokeRect(-bw / 2, -r - 40, bw, 9);
+      ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(-bw / 2, -r - 40, bw, 9);
+      ctx.fillStyle = "#ff2e6d"; ctx.fillRect(-bw / 2, -r - 40, bw * clamp(z.hp / z.maxHp, 0, 1), 9);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.strokeRect(-bw / 2, -r - 40, bw, 9);
     }
-
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    if (Math.random() < 0.012) {
+    if (Math.random() < 0.012)
       particles.push({ x: z.x + rand(-z.r * .5, z.r * .5), y: z.y + z.r * .6, vx: 0, vy: 30, r: rand(1.5, 2.5), life: .5, max: .5, color: "#6b1414", grav: true });
-    }
   }
 }
 
-/* =========================================================
- *  子彈繪製 —— 依 kind 分流
- * ========================================================= */
+/* 子彈繪製（全部直線型態） */
 function drawBullets() {
   for (const b of bullets) {
     ctx.save();
@@ -1051,90 +1061,50 @@ function drawBullets() {
         ctx.fillStyle = b.color;
         ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2); ctx.fill();
         break;
-
       case "tracer": {
         ctx.strokeStyle = b.color; ctx.globalAlpha = .3; ctx.lineWidth = 2;
         ctx.beginPath();
-        for (let i = 0; i < b.trail.length; i++) {
-          const t = b.trail[i];
-          i === 0 ? ctx.moveTo(t.x, t.y) : ctx.lineTo(t.x, t.y);
-        }
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        for (let i = 0; i < b.trail.length; i++) { const t = b.trail[i]; i === 0 ? ctx.moveTo(t.x, t.y) : ctx.lineTo(t.x, t.y); }
+        ctx.stroke(); ctx.globalAlpha = 1;
         if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 8; }
         ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(b.x - Math.cos(b.angle) * 14, b.y - Math.sin(b.angle) * 14);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 14); ctx.lineTo(b.x, b.y); ctx.stroke();
         break;
       }
-
       case "laser": {
         if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 14; }
         ctx.strokeStyle = b.color; ctx.lineWidth = 5; ctx.globalAlpha = .45;
-        ctx.beginPath();
-        ctx.moveTo(b.x - Math.cos(b.angle) * 30, b.y - Math.sin(b.angle) * 30);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(b.x - Math.cos(b.angle) * 30, b.y - Math.sin(b.angle) * 30);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 30); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 30); ctx.lineTo(b.x, b.y); ctx.stroke();
         break;
       }
-
-      case "rocket": {
-        particles.push({ x: b.x - Math.cos(b.angle) * 10, y: b.y - Math.sin(b.angle) * 10,
-                         vx: rand(-30, 30), vy: rand(20, 80), r: rand(2, 4), life: .18, max: .18,
-                         color: Math.random() < .5 ? "#ff9d5c" : "#ffd24d" });
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.angle + Math.PI / 2);
-        if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 10; }
-        ctx.fillStyle = "#e8e8e8";
-        ctx.beginPath();
-        ctx.moveTo(0, -10); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.fill();
-        ctx.fillStyle = b.color;
-        ctx.fillRect(-4, 4, 8, 5);
+      case "rail": {                                   // 重型軌道砲彈：粗亮直線光柱
+        if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 16; }
+        ctx.strokeStyle = b.color; ctx.lineWidth = 8; ctx.globalAlpha = .4;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 40); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = "#fff6e8"; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 40); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill();
         break;
       }
-
       case "plasma": {
         const pulse = 1 + Math.sin(b.t * 30) * .3;
         if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 16; }
         ctx.fillStyle = b.color; ctx.globalAlpha = .5;
         ctx.beginPath(); ctx.arc(b.x, b.y, 7 * pulse, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#ffffff";
+        ctx.globalAlpha = 1; ctx.fillStyle = "#ffffff";
         ctx.beginPath(); ctx.arc(b.x, b.y, 3.2, 0, Math.PI * 2); ctx.fill();
-        if (Math.random() < .4) {
-          ctx.strokeStyle = b.color; ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(b.x, b.y);
-          ctx.lineTo(b.x + rand(-12, 12), b.y + rand(-12, 12));
-          ctx.stroke();
-        }
         break;
       }
-
       case "spear": {
         if (!isMobile) { ctx.shadowColor = b.color; ctx.shadowBlur = 18; }
         ctx.strokeStyle = b.color; ctx.lineWidth = 7; ctx.globalAlpha = .4;
-        ctx.beginPath();
-        ctx.moveTo(b.x - Math.cos(b.angle) * 46, b.y - Math.sin(b.angle) * 46);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(b.x - Math.cos(b.angle) * 46, b.y - Math.sin(b.angle) * 46);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-        ctx.fillStyle = "#ffffff";
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.t * 12);
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 46); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y + 46); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.translate(b.x, b.y); ctx.rotate(b.t * 12);
         for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-1, -9, 2, 9); }
         break;
       }
@@ -1146,74 +1116,42 @@ function drawBullets() {
 function drawArcs() {
   for (const a of arcs) {
     const alpha = clamp(a.life / a.max, 0, 1);
-    ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.save(); ctx.globalAlpha = alpha;
     if (!isMobile) { ctx.shadowColor = a.color; ctx.shadowBlur = 10; }
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(a.x1, a.y1);
+    ctx.beginPath(); ctx.moveTo(a.x1, a.y1);
     const seg = 5;
-    for (let i = 1; i < seg; i++) {
-      const t = i / seg;
-      ctx.lineTo(a.x1 + (a.x2 - a.x1) * t + rand(-9, 9), a.y1 + (a.y2 - a.y1) * t + rand(-9, 9));
-    }
-    ctx.lineTo(a.x2, a.y2);
-    ctx.stroke();
-    ctx.restore();
+    for (let i = 1; i < seg; i++) { const t = i / seg; ctx.lineTo(a.x1 + (a.x2 - a.x1) * t + rand(-9, 9), a.y1 + (a.y2 - a.y1) * t + rand(-9, 9)); }
+    ctx.lineTo(a.x2, a.y2); ctx.stroke(); ctx.restore();
   }
 }
 
-/* =========================================================
- *  小隊繪製 —— 橫排編隊 + 兵種外觀進化
- * ========================================================= */
 function drawSquad() {
-  const tp = TROOPS[troopTier()];
-  const tier = troopTier();
+  const tp = TROOPS[SQUAD.rank];
+  const tier = SQUAD.rank;
   for (const p of soldierPositions()) {
-    ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.save(); ctx.translate(p.x, p.y);
     if (tp.aura) {
-      ctx.strokeStyle = tp.aura;
-      ctx.globalAlpha = .4 + Math.sin(G.time * 5) * .2;
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(0, 12, tp.size + 5, 6, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.strokeStyle = tp.aura; ctx.globalAlpha = .4 + Math.sin(G.time * 5) * .2; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 12, tp.size + 5, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
     }
     if (!isMobile) { ctx.shadowColor = tp.body; ctx.shadowBlur = tier >= 3 ? 12 : 6; }
-    ctx.fillStyle = tp.body;
-    ctx.beginPath(); ctx.arc(0, 0, tp.size, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = tp.body; ctx.beginPath(); ctx.arc(0, 0, tp.size, 0, Math.PI * 2); ctx.fill();
     if (!isMobile) ctx.shadowBlur = 0;
-    // 肩甲（重裝以上）
     if (tier >= 2) {
       ctx.fillStyle = "rgba(255,255,255,.25)";
       ctx.beginPath(); ctx.ellipse(-tp.size * .8, -2, tp.size * .35, tp.size * .5, .3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse( tp.size * .8, -2, tp.size * .35, tp.size * .5, -.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(tp.size * .8, -2, tp.size * .35, tp.size * .5, -.3, 0, Math.PI * 2); ctx.fill();
     }
-    // 頭盔（動力甲以上有面罩發光縫）
-    ctx.fillStyle = "#0e1320";
-    ctx.beginPath(); ctx.arc(0, -3, tp.size * .62, Math.PI, 0); ctx.fill();
-    if (tier >= 4) {
-      ctx.strokeStyle = tp.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(-tp.size * .4, -4); ctx.lineTo(tp.size * .4, -4); ctx.stroke();
-    }
-    // 槍管（越高階越粗長；泰坦雙叉光矛槍）
-    ctx.strokeStyle = "#dfe7ff";
-    ctx.lineWidth = 2.5 + tier * .5;
-    ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(0, -13 - tier * 2.5); ctx.stroke();
-    if (tier === 6) {
-      ctx.strokeStyle = tp.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(-4, -13); ctx.lineTo(-4, -22); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo( 4, -13); ctx.lineTo( 4, -22); ctx.stroke();
+    ctx.fillStyle = "#0e1320"; ctx.beginPath(); ctx.arc(0, -3, tp.size * .62, Math.PI, 0); ctx.fill();
+    if (tier >= 4) { ctx.strokeStyle = tp.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-tp.size * .4, -4); ctx.lineTo(tp.size * .4, -4); ctx.stroke(); }
+    ctx.strokeStyle = "#dfe7ff"; ctx.lineWidth = 2.5 + tier * .5;
+    // 依槍管數畫槍管（並排，都朝上）
+    for (let bi = 0; bi < tp.barrels; bi++) {
+      const ox = tp.barrels > 1 ? (bi - (tp.barrels - 1) / 2) * 6 : 0;
+      ctx.beginPath(); ctx.moveTo(ox, -4); ctx.lineTo(ox, -13 - tier * 2.5); ctx.stroke();
     }
     ctx.restore();
-  }
-  if (SQUAD.count > 15) {
-    ctx.fillStyle = "#ffd24d";
-    ctx.font = "900 16px sans-serif";
-    ctx.textAlign = "center";
-    if (!isMobile) { ctx.shadowColor = "#000"; ctx.shadowBlur = 6; }
-    ctx.fillText("x" + SQUAD.count, SQUAD.x, squadY() - 30);
-    if (!isMobile) ctx.shadowBlur = 0;
   }
 }
 
@@ -1229,74 +1167,55 @@ function drawParticles() {
 function drawBeams() {
   for (const bm of beams) {
     const a = clamp(bm.life / bm.max, 0, 1);
-    ctx.save();
-    ctx.globalAlpha = a;
+    ctx.save(); ctx.globalAlpha = a;
     const grd = ctx.createLinearGradient(bm.x - bm.w / 2, 0, bm.x + bm.w / 2, 0);
-    grd.addColorStop(0, "rgba(255,255,255,0)");
-    grd.addColorStop(.5, "rgba(255,255,255,.95)");
-    grd.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(bm.x - bm.w / 2, 0, bm.w, H);
-    ctx.fillStyle = "rgba(126,240,255,.5)";
-    ctx.fillRect(bm.x - bm.w / 6, 0, bm.w / 3, H);
+    grd.addColorStop(0, "rgba(255,255,255,0)"); grd.addColorStop(.5, "rgba(255,255,255,.95)"); grd.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grd; ctx.fillRect(bm.x - bm.w / 2, 0, bm.w, H);
+    ctx.fillStyle = "rgba(126,240,255,.5)"; ctx.fillRect(bm.x - bm.w / 6, 0, bm.w / 3, H);
     ctx.restore();
   }
 }
 
-/* =========================================================
- *  威脅指示器 —— 頂端顯示各道類型與數量
- *  讓玩家判斷「這波該顧哪邊」
- * ========================================================= */
+function drawFreezeTint() {
+  // 凍結時全屏淡藍
+  ctx.fillStyle = `rgba(126,220,255,${0.10 + Math.sin(G.time * 4) * 0.03})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
+const threatNearY = { L: 0, R: 0 };
 function drawThreatIndicators() {
-  const draw = (cx, lane) => {
+  const drawOne = (cx, lane) => {
     const prof = PROFILES[lanes[lane].profile];
     const cnt = lanes[lane].count;
-    // 威脅強度：數量越多越紅
-    const heat = clamp(cnt / 14, 0, 1);
-    const barW = 92, barH = 7;
-    const y = 74;
-    // 底條
-    ctx.fillStyle = "rgba(0,0,0,.45)";
-    ctx.fillRect(cx - barW / 2, y, barW, barH);
-    // 熱度條（綠→黃→紅）
-    const hue = 120 - heat * 120;
-    ctx.fillStyle = `hsl(${hue}, 85%, 55%)`;
-    ctx.fillRect(cx - barW / 2, y, barW * clamp(cnt / 16, 0, 1), barH);
-    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 1;
-    ctx.strokeRect(cx - barW / 2, y, barW, barH);
-    // 類型標籤 + 數量
-    ctx.textAlign = "center";
-    ctx.font = "900 13px 'Noto Sans TC', sans-serif";
+    const barW = 92, barH = 7, y = 74;
+    ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(cx - barW / 2, y, barW, barH);
+    const hue = 120 - clamp(cnt / 14, 0, 1) * 120;
+    ctx.fillStyle = `hsl(${hue}, 85%, 55%)`; ctx.fillRect(cx - barW / 2, y, barW * clamp(cnt / 16, 0, 1), barH);
+    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 1; ctx.strokeRect(cx - barW / 2, y, barW, barH);
+    ctx.textAlign = "center"; ctx.font = "900 13px 'Noto Sans TC', sans-serif";
     ctx.fillStyle = prof.color;
     if (!isMobile) { ctx.shadowColor = "#000"; ctx.shadowBlur = 4; }
     ctx.fillText(prof.label + " " + cnt, cx, y - 6);
     if (!isMobile) ctx.shadowBlur = 0;
-    // 逼近警示箭頭（有怪快到防線時閃爍）
     const nearY = lane === "L" ? threatNearY.L : threatNearY.R;
     if (nearY > H * .6 && Math.sin(G.time * 12) > 0) {
-      ctx.fillStyle = "#ff3d3d";
-      ctx.font = "900 16px sans-serif";
-      ctx.fillText("▼", cx, y + 22);
+      ctx.fillStyle = "#ff3d3d"; ctx.font = "900 16px sans-serif"; ctx.fillText("▼", cx, y + 22);
     }
   };
-  draw(W * .25, "L");
-  draw(W * .75, "R");
+  drawOne(W * .25, "L");
+  drawOne(W * .75, "R");
 }
-// 追蹤各道最逼近的 y（給指示器箭頭用）
-const threatNearY = { L: 0, R: 0 };
 
 function drawDmgTexts() {
   for (const d of dmgTexts) {
     const a = clamp(d.life / .7, 0, 1);
-    ctx.globalAlpha = a;
-    ctx.textAlign = "center";
+    ctx.globalAlpha = a; ctx.textAlign = "center";
     if (d.text) {
       ctx.font = d.small ? "700 18px 'Noto Sans TC', sans-serif" : "900 30px 'Noto Sans TC', sans-serif";
       ctx.fillStyle = d.color || "#7ef0ff";
       if (!isMobile) { ctx.shadowColor = d.color || "#4db8ff"; ctx.shadowBlur = 16; }
     } else if (d.text2) {
-      ctx.font = "900 24px 'Noto Sans TC', sans-serif";
-      ctx.fillStyle = "#7ef0ff";
+      ctx.font = "900 24px 'Noto Sans TC', sans-serif"; ctx.fillStyle = "#7ef0ff";
       if (!isMobile) { ctx.shadowColor = "#4db8ff"; ctx.shadowBlur = 12; }
     } else {
       ctx.font = d.crit ? "900 19px sans-serif" : "700 13px sans-serif";
@@ -1312,10 +1231,8 @@ function drawDmgTexts() {
 function drawDangerVignette() {
   if (G.dangerAlpha <= 0.01) return;
   const grd = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.max(W, H) * .72);
-  grd.addColorStop(0, "rgba(200,20,20,0)");
-  grd.addColorStop(1, `rgba(200,20,20,${G.dangerAlpha})`);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
+  grd.addColorStop(0, "rgba(200,20,20,0)"); grd.addColorStop(1, `rgba(200,20,20,${G.dangerAlpha})`);
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
 }
 
 /* ---------- 主迴圈 ---------- */
@@ -1325,7 +1242,6 @@ function loop(ts) {
   last = ts;
   if (G.running) {
     update(dt);
-    // 更新指示器箭頭用的最逼近 y
     threatNearY.L = 0; threatNearY.R = 0;
     for (const z of zombies) {
       if (z.dead) continue;
